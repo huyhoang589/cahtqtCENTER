@@ -54,7 +54,7 @@ pub type FnProgressCallback = unsafe extern "C" fn(
 
 // ---- DLL export function pointer types --------------------------------------
 
-pub type FnEncHTQTMulti = unsafe extern "C" fn(
+pub type FnEncHTQTSfMulti = unsafe extern "C" fn(
     params: *const BatchEncryptParams,
     cbs: *const CryptoCallbacksV2,
     results: *mut BatchResult,
@@ -62,11 +62,10 @@ pub type FnEncHTQTMulti = unsafe extern "C" fn(
     error_len: c_int,
 ) -> c_int;
 
-pub type FnDecHTQTV2 = unsafe extern "C" fn(
-    sf_path: *const c_char,
-    output_path: *const c_char,
-    recipient_id: *const c_char,
+pub type FnDecHTQTSf = unsafe extern "C" fn(
+    params: *const BatchSfDecryptParams,
     cbs: *const CryptoCallbacksV2,
+    results: *mut BatchResult,
     error_msg: *mut c_char,
     error_len: c_int,
 ) -> c_int;
@@ -128,6 +127,19 @@ pub struct BatchEncryptParams {
 
 unsafe impl Send for BatchEncryptParams {}
 unsafe impl Sync for BatchEncryptParams {}
+
+/// Batch decrypt parameters for SF v1 files.
+#[repr(C)]
+pub struct BatchSfDecryptParams {
+    pub files: *const FileEntry,    // input_path = .sf1 file; file_id for result tracking
+    pub file_count: u32,
+    pub output_dir: *const c_char,  // filenames taken from orig_name in SF header
+    pub flags: u32,
+    pub reserved: [*mut c_void; 2], // must be NULL
+}
+
+unsafe impl Send for BatchSfDecryptParams {}
+unsafe impl Sync for BatchSfDecryptParams {}
 
 /// Result entry for one (file, recipient) pair in batch encrypt.
 #[repr(C)]

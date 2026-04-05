@@ -110,12 +110,7 @@ async fn run_encrypt_batch(
 
     let file_count = src_paths.len();
     let recip_count = cert_paths.len();
-    let total_pairs = file_count * recip_count;
 
-    if total_pairs > 10_000 {
-        emit_app_log(app, "warning",
-            &format!("Large batch: {} files × {} recipients = {} operations", file_count, recip_count, total_pairs));
-    }
     emit_app_log(app, "info",
         &format!("Starting encryption: {} file(s) × {} recipient(s)", file_count, recip_count));
 
@@ -222,7 +217,7 @@ async fn run_encrypt_batch(
             reserved: [ptr::null_mut(); 3],
         };
 
-        let mut batch_results: Vec<BatchResult> = (0..total_pairs)
+        let mut batch_results: Vec<BatchResult> = (0..file_count)
             .map(|_| BatchResult::default())
             .collect();
 
@@ -239,15 +234,13 @@ async fn run_encrypt_batch(
     .await
     .map_err(|e| e.to_string())??;
 
-    // Collect results per (file, recipient) pair, emit progress events, and log to DB
+    // Collect results per file, emit progress events, and log to DB
     let mut success_count = 0usize;
     let mut error_count = 0usize;
     let mut errors: Vec<String> = Vec::new();
-    let total_files = src_paths.len();
 
-    for (pair_idx, result) in batch_results.iter().enumerate() {
+    for result in batch_results.iter() {
         let fi = result.file_index as usize;
-        let ri = result.recipient_index as usize;
         let file_path_str = src_paths.get(fi).map(String::as_str).unwrap_or("?");
         let output_path = crate::ffi_helpers::string_from_c_buf(&result.output_path);
 
@@ -269,15 +262,14 @@ async fn run_encrypt_batch(
             } else {
                 format!("[{}] {}: {} — {}", result.status, name, message, detail)
             };
-            let recip_id = recipient_id_strings.get(ri).map(String::as_str).unwrap_or("?");
-            errors.push(format!("{}+{}: {}", file_name, recip_id, error_str));
+            errors.push(format!("{}: {}", file_name, error_str));
             ("error".to_string(), Some(error_str))
         };
 
         // Emit per-file progress event for UI status tracking
         let _ = app.emit("encrypt-progress", EncryptProgress {
-            current: pair_idx + 1,
-            total: total_files,
+            current: fi + 1,
+            total: file_count,
             file_name: file_name.clone(),
             file_path: file_path_str.to_string(),
             status: status_str.clone(),
