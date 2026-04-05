@@ -243,7 +243,6 @@ dependencies = [
  "cryptoki",
  "dirs 5.0.1",
  "libloading 0.8.9",
- "rand 0.8.5",
  "rsa",
  "secrecy",
  "serde",

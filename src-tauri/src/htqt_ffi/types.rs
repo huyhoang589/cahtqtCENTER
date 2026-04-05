@@ -62,12 +62,16 @@ pub type FnEncHTQTSfMulti = unsafe extern "C" fn(
     error_len: c_int,
 ) -> c_int;
 
-pub type FnDecHTQTSf = unsafe extern "C" fn(
-    params: *const BatchSfDecryptParams,
+/// decrypt_one_sfv1: decrypt a single SF v1 file using callback-based crypto.
+pub type FnDecryptOneSfv1 = unsafe extern "C" fn(
+    sf1_path: *const c_char,
+    output_dir: *const c_char,
     cbs: *const CryptoCallbacksV2,
-    results: *mut BatchResult,
-    error_msg: *mut c_char,
-    error_len: c_int,
+    flags: c_uint,
+    out_path_buf: *mut c_char,
+    out_path_buf_len: c_int,
+    err_buf: *mut c_char,
+    err_len: c_int,
 ) -> c_int;
 
 pub type FnGetError = unsafe extern "C" fn() -> c_int;
@@ -127,19 +131,6 @@ pub struct BatchEncryptParams {
 
 unsafe impl Send for BatchEncryptParams {}
 unsafe impl Sync for BatchEncryptParams {}
-
-/// Batch decrypt parameters for SF v1 files.
-#[repr(C)]
-pub struct BatchSfDecryptParams {
-    pub files: *const FileEntry,    // input_path = .sf1 file; file_id for result tracking
-    pub file_count: u32,
-    pub output_dir: *const c_char,  // filenames taken from orig_name in SF header
-    pub flags: u32,
-    pub reserved: [*mut c_void; 2], // must be NULL
-}
-
-unsafe impl Send for BatchSfDecryptParams {}
-unsafe impl Sync for BatchSfDecryptParams {}
 
 /// Result entry for one (file, recipient) pair in batch encrypt.
 #[repr(C)]

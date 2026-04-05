@@ -11,10 +11,9 @@ use crate::{
     etoken::models::TokenStatus,
     htqt_ffi::{
         callbacks,
-        error_codes::{HTQT_BATCH_CONTINUE_ON_ERROR, HTQT_OK},
-        htqt_error_message, htqt_error_name,
+        error_codes::HTQT_BATCH_CONTINUE_ON_ERROR,
         token_context::open_token_session,
-        BatchResult, BatchSfDecryptParams, CryptoCallbacksV2, FileEntry,
+        CryptoCallbacksV2,
     },
     lock_helper::{safe_lock, OperationGuard},
     AppState,
@@ -38,8 +37,8 @@ pub struct DecryptResult {
     pub errors: Vec<String>,
 }
 
-/// Decrypt M .sf files using decHTQT_v2 with callback-based crypto.
-/// recipient_id sourced from AppState.token_login.cert_cn (no frontend param needed).
+/// Decrypt M .sf files using decrypt_one_sfv1 with callback-based crypto.
+/// One PKCS#11 session opened; N per-file decrypt_one_sfv1 calls inside spawn_blocking.
 #[tauri::command]
 pub async fn decrypt_batch(
     app: AppHandle,
@@ -106,43 +105,15 @@ async fn run_decrypt_batch(
     let file_paths_owned = file_paths.to_vec();
     let output_dir_str_clone = output_dir_str.clone();
 
-    // Batch decrypt: build BatchSfDecryptParams, single dec_sf() call
-    let dec_results = tokio::task::spawn_blocking(move || -> Result<Vec<BatchResult>, String> {
+    // Per-file decrypt: one session, N × decrypt_one_sfv1 calls
+    let dec_results = tokio::task::spawn_blocking(move || -> Result<Vec<(usize, Result<String, String>)>, String> {
+        let output_dir_cstring = CString::new(output_dir_str_clone.as_str())
+            .map_err(|e| e.to_string())?;
         let input_cstrings: Vec<CString> = file_paths_owned.iter()
             .map(|p| CString::new(p.as_str()).map_err(|e| e.to_string()))
             .collect::<Result<_, _>>()?;
-        // file_id = stem for result tracking
-        let file_id_cstrings: Vec<CString> = file_paths_owned.iter()
-            .map(|p| {
-                let stem = Path::new(p).file_stem()
-                    .map(|s| s.to_string_lossy().to_string())
-                    .unwrap_or_else(|| "file".to_string());
-                CString::new(stem).map_err(|e| e.to_string())
-            })
-            .collect::<Result<_, _>>()?;
-        let output_dir_cstring = CString::new(output_dir_str_clone.as_str())
-            .map_err(|e| e.to_string())?;
 
-        let file_entries: Vec<FileEntry> = (0..file_count)
-            .map(|i| FileEntry {
-                input_path: input_cstrings[i].as_ptr(),
-                file_id: file_id_cstrings[i].as_ptr(),
-            })
-            .collect();
-
-        let params = BatchSfDecryptParams {
-            files: file_entries.as_ptr(),
-            file_count: file_count as u32,
-            output_dir: output_dir_cstring.as_ptr(),
-            flags: HTQT_BATCH_CONTINUE_ON_ERROR,
-            reserved: [ptr::null_mut(); 2],
-        };
-
-        let mut batch_results: Vec<BatchResult> = (0..file_count)
-            .map(|_| BatchResult::default())
-            .collect();
-
-        // Open PKCS#11 session for decrypt operations
+        // Open ONE PKCS#11 session for all decrypt calls
         let ctx = open_token_session(
             &pkcs11_lib,
             slot_id,
@@ -151,30 +122,39 @@ async fn run_decrypt_batch(
             own_cert_der_clone.clone(),
             "decrypt-progress".to_string(),
         )?;
-
         let ctx_box = Box::new(ctx);
         let user_ctx_ptr = &*ctx_box as *const _ as *mut c_void;
 
-        // For decrypt: sign_fn + rsa_enc_cert_fn are NOT required (null/None)
         let cbs = CryptoCallbacksV2 {
             sign_fn: None,
             rsa_enc_cert_fn: None,
             rsa_dec_fn: Some(callbacks::cb_rsa_oaep_decrypt),
             verify_fn: Some(callbacks::cb_rsa_pss_verify),
-            progress_fn: None, // decrypt does not use progress callback
+            progress_fn: None,
             user_ctx: user_ctx_ptr,
             own_cert_der: if own_cert_der_clone.is_empty() { ptr::null() } else { own_cert_der_clone.as_ptr() },
             own_cert_der_len: own_cert_der_clone.len() as u32,
             reserved: [ptr::null_mut(); 3],
         };
 
+        // Loop: one decrypt_one_sfv1 call per file (DLL_LOCK acquired/released per call)
         let guard = crate::lock_helper::safe_lock(&htqt_lib_arc)?;
         let lib = guard.as_ref().ok_or("htqt_crypto.dll not loaded")?;
-        lib.dec_sf(&params, &cbs, &mut batch_results)?;
-        drop(guard);
-        drop(ctx_box); // closes session + finalizes Pkcs11
 
-        Ok(batch_results)
+        let mut file_results: Vec<(usize, Result<String, String>)> = Vec::with_capacity(file_count);
+        for (i, cstr) in input_cstrings.iter().enumerate() {
+            let result = lib.decrypt_one_sfv1(
+                cstr.as_ptr(),
+                output_dir_cstring.as_ptr(),
+                &cbs,
+                HTQT_BATCH_CONTINUE_ON_ERROR,
+            );
+            file_results.push((i, result));
+        }
+        drop(guard);
+        drop(ctx_box); // closes session
+
+        Ok(file_results)
     })
     .await
     .map_err(|e| e.to_string())??;
@@ -184,34 +164,26 @@ async fn run_decrypt_batch(
     let mut error_count = 0usize;
     let mut errors: Vec<String> = Vec::new();
 
-    for (i, result) in dec_results.iter().enumerate() {
-        let fi = result.file_index as usize;
-        let file_path = file_paths.get(fi).map(String::as_str).unwrap_or("?");
-        // output_path filled by DLL from SF header orig_name
-        let output_path = crate::ffi_helpers::string_from_c_buf(&result.output_path);
-        let dst_for_log = if output_path.is_empty() { &output_dir_str } else { &output_path };
+    for (i, (file_idx, result)) in dec_results.iter().enumerate() {
+        let file_path = file_paths.get(*file_idx).map(String::as_str).unwrap_or("?");
 
         let file_name = Path::new(file_path)
             .file_name()
             .map(|n| n.to_string_lossy().to_string())
             .unwrap_or_else(|| file_path.to_string());
 
-        let (status_str, error_msg) = if result.status == HTQT_OK {
-            success_count += 1;
-            ("success".to_string(), None)
-        } else {
-            error_count += 1;
-            let name = htqt_error_name(result.status);
-            let message = htqt_error_message(result.status);
-            let detail = crate::ffi_helpers::string_from_c_buf(&result.error_detail);
-            let error_str = if detail.is_empty() {
-                format!("[{}] {}: {}", result.status, name, message)
-            } else {
-                format!("[{}] {}: {} — {}", result.status, name, message, detail)
-            };
-            emit_app_log(app, "error", &format!("[DECRYPT] {}: {}", file_name, error_str));
-            errors.push(format!("{}: {}", file_name, error_str));
-            ("error".to_string(), Some(error_str))
+        let (status_str, error_msg, dst_for_log) = match result {
+            Ok(output_path) => {
+                success_count += 1;
+                let dst = if output_path.is_empty() { &output_dir_str } else { output_path };
+                ("success".to_string(), None, dst.clone())
+            }
+            Err(err_str) => {
+                error_count += 1;
+                emit_app_log(app, "error", &format!("[DECRYPT] {}: {}", file_name, err_str));
+                errors.push(format!("{}: {}", file_name, err_str));
+                ("error".to_string(), Some(err_str.clone()), output_dir_str.clone())
+            }
         };
 
         // Emit per-file progress event
@@ -229,7 +201,7 @@ async fn run_decrypt_batch(
             &state.db,
             "DECRYPT",
             file_path,
-            dst_for_log,
+            &dst_for_log,
             None,
             &status_str,
             error_msg.as_deref(),
