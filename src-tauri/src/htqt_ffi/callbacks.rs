@@ -4,9 +4,9 @@ use std::slice;
 
 use cryptoki::mechanism::rsa::{PkcsMgfType, PkcsOaepParams, PkcsOaepSource, PkcsPssParams};
 use cryptoki::mechanism::{Mechanism, MechanismType};
-use cryptoki::object::{Attribute, KeyType, ObjectClass};
 use rsa::pkcs8::DecodePublicKey;
-use rsa::traits::PublicKeyParts;
+use rsa::pss::{Signature as PssSignature, VerifyingKey};
+use rsa::signature::hazmat::PrehashVerifier;
 use rsa::RsaPublicKey;
 use serde::Serialize;
 use tauri::Emitter;
@@ -162,7 +162,8 @@ pub unsafe extern "C" fn cb_rsa_oaep_decrypt(
 }
 
 /// RSA-PSS-SHA256 verify sender's signature against pre-hashed digest using sender cert.
-/// Invoked by DLL during decrypt — uses C_CreateObject + C_Verify (salt=32 fixed).
+/// Performed in software — public key verification does not require token hardware.
+/// Token-based C_Verify with imported session keys fails on many tokens (CKR_MECHANISM_INVALID).
 pub unsafe extern "C" fn cb_rsa_pss_verify(
     digest: *const u8,
     digest_len: u32,
@@ -170,51 +171,30 @@ pub unsafe extern "C" fn cb_rsa_pss_verify(
     sig_len: u32,
     sender_cert_der: *const u8,
     sender_cert_der_len: u32,
-    user_ctx: *mut c_void,
+    _user_ctx: *mut c_void, // not used: public key op is pure software
 ) -> i32 {
     let result = catch_unwind(|| -> i32 {
-        if digest.is_null() || sig.is_null() || sender_cert_der.is_null() || user_ctx.is_null() {
+        if digest.is_null() || sig.is_null() || sender_cert_der.is_null() {
             return -1;
         }
-        let ctx = &*(user_ctx as *const TokenContext);
         let digest_slice = slice::from_raw_parts(digest, digest_len as usize);
         let sig_slice = slice::from_raw_parts(sig, sig_len as usize);
         let cert_slice = slice::from_raw_parts(sender_cert_der, sender_cert_der_len as usize);
 
-        // Extract sender's RSA public key components from cert
-        let (modulus, exponent) = match extract_rsa_key_components(cert_slice) {
-            Ok(kc) => kc,
-            Err(e) => { eprintln!("[cb_verify] key extract: {}", e); return -1; }
+        // Parse sender's RSA public key from cert
+        let pub_key = match parse_rsa_pub_key(cert_slice) {
+            Ok(k) => k,
+            Err(e) => { eprintln!("[cb_verify] key parse: {}", e); return -1; }
         };
 
-        // Import sender public key as session object on token (CKA_TOKEN=false)
-        let attrs = vec![
-            Attribute::Class(ObjectClass::PUBLIC_KEY),
-            Attribute::KeyType(KeyType::RSA),
-            Attribute::Modulus(modulus),
-            Attribute::PublicExponent(exponent),
-            Attribute::Verify(true),
-            Attribute::Token(false),
-            Attribute::Private(false),
-        ];
-        let pub_handle = match ctx.session().create_object(&attrs) {
-            Ok(h) => h,
-            Err(e) => { eprintln!("[cb_verify] create_object: {}", e); return -1; }
+        // Software RSA-PSS-SHA256 verify — public key op, no token hardware needed
+        // VerifyingKey<Sha256> defaults to salt length = digest length (32), matching cb_rsa_pss_sign
+        let verifying_key = VerifyingKey::<sha2::Sha256>::new(pub_key);
+        let signature = match PssSignature::try_from(sig_slice) {
+            Ok(s) => s,
+            Err(e) => { eprintln!("[cb_verify] signature parse: {}", e); return -1; }
         };
-
-        // RSA-PSS-SHA256 verify via token hardware (pre-hashed digest, salt=32 fixed)
-        let pss_params = PkcsPssParams {
-            hash_alg: MechanismType::SHA256,
-            mgf: PkcsMgfType::MGF1_SHA256,
-            s_len: 32_usize.try_into().expect("32 fits in Ulong"),
-        };
-        let mechanism = Mechanism::RsaPkcsPss(pss_params);
-        let verify_result = ctx.session().verify(&mechanism, pub_handle, digest_slice, sig_slice);
-
-        // Always destroy session key object
-        let _ = ctx.session().destroy_object(pub_handle);
-
-        match verify_result {
+        match verifying_key.verify_prehash(digest_slice, &signature) {
             Ok(()) => 0,
             Err(e) => { eprintln!("[cb_verify] PSS verify failed: {}", e); -1 }
         }
@@ -251,15 +231,6 @@ fn parse_rsa_pub_key(cert_der: &[u8]) -> Result<RsaPublicKey, String> {
     let spki_der = cert.public_key().raw.to_vec();
     RsaPublicKey::from_public_key_der(&spki_der)
         .map_err(|e| format!("RSA key parse: {}", e))
-}
-
-/// Parse cert DER → extract RSA modulus + public exponent as big-endian bytes.
-/// Used by cb_rsa_pss_verify for C_CreateObject token attributes.
-fn extract_rsa_key_components(cert_der: &[u8]) -> Result<(Vec<u8>, Vec<u8>), String> {
-    let pub_key = parse_rsa_pub_key(cert_der)?;
-    let modulus = pub_key.n().to_bytes_be();
-    let exponent = pub_key.e().to_bytes_be();
-    Ok((modulus, exponent))
 }
 
 // ---- Tests ------------------------------------------------------------------
