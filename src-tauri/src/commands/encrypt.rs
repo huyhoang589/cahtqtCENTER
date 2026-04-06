@@ -207,9 +207,7 @@ async fn run_encrypt_batch(
 
         let cbs = CryptoCallbacksV2 {
             sign_fn: Some(callbacks::cb_rsa_pss_sign),
-            rsa_enc_cert_fn: Some(callbacks::cb_rsa_oaep_enc_cert),
             rsa_dec_fn: Some(callbacks::cb_rsa_oaep_decrypt),
-            verify_fn: Some(callbacks::cb_rsa_pss_verify),
             progress_fn: Some(callbacks::cb_progress),
             user_ctx: user_ctx_ptr,
             own_cert_der: if own_cert_der.is_empty() { ptr::null() } else { own_cert_der.as_ptr() },

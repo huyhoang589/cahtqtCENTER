@@ -127,9 +127,7 @@ async fn run_decrypt_batch(
 
         let cbs = CryptoCallbacksV2 {
             sign_fn: None,
-            rsa_enc_cert_fn: None,
             rsa_dec_fn: Some(callbacks::cb_rsa_oaep_decrypt),
-            verify_fn: Some(callbacks::cb_rsa_pss_verify),
             progress_fn: None,
             user_ctx: user_ctx_ptr,
             own_cert_der: if own_cert_der_clone.is_empty() { ptr::null() } else { own_cert_der_clone.as_ptr() },
