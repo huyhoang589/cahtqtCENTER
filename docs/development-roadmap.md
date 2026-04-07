@@ -1,8 +1,8 @@
 # Development Roadmap
 
 **Project:** CAHTQT — PKI Encryption Desktop App  
-**Last Updated:** 2026-04-05  
-**Current Phase:** Feature-Complete (v2.0.0 released)
+**Last Updated:** 2026-04-07  
+**Current Phase:** Feature-Complete (v2.0.0 released, v2.1.0 in progress)
 
 ## Overview
 
@@ -15,12 +15,17 @@ v1.0.0 (2026-02-21)
 ├─ Initial desktop app with M×N batch encryption
 └─ PKCS#11 token integration
 
-v2.0.0 (2026-04-05) ◄─ CURRENT
+v2.0.0 (2026-04-05)
 ├─ Crypto API v2: SF v1 batch format
 ├─ Single batch call (vs. M or M×N calls)
 └─ Improved performance & reduced overhead
 
-v2.1.0 (Planned — Q2 2026)
+v2.1.0 (In Progress — Q2 2026) ◄─ CURRENT
+├─ [x] License Gen Page — Server-side license generation
+│  ├─ Machine Credential import + validation
+│  ├─ PKCS#11 RSA-PSS signing via Bit4ID token
+│  ├─ SQLite audit history tracking
+│  └─ Frontend page + routing
 ├─ [ ] Multiple recipient block formats
 ├─ [ ] Selective decryption (decrypt for subset of recipients)
 └─ [ ] Enhanced progress reporting
@@ -72,13 +77,37 @@ v3.0.0 (Future — H2 2026)
 
 ---
 
-## Planned Phase: v2.1.0 — Enhanced Batch Operations
+## Current Phase: v2.1.0 — Enhanced Batch Operations + License Gen
 
 **Target:** Q2 2026  
 **Estimated Duration:** 2-3 weeks  
-**Status:** Planned (not started)
+**Status:** In Progress
 
-### Feature: Selective Decryption
+### Completed: License Gen Page (2026-04-07)
+
+**Summary:** Server-side license generation for hardware-bound licenses. Administrators import Machine Credential JSON, sign with server PKCS#11 token, and track issuance history.
+
+**Features Delivered:**
+- Machine Credential import + validation (JSON files)
+- PKCS#11 RSA-PSS signing via Bit4ID token
+- Canonical JSON serialization (SHA-256 digest)
+- Machine fingerprint computation (16-char hex)
+- SQLite audit history (`license_audit` table)
+- Frontend page at `/license-gen`
+- Sidebar navigation entry
+- Audit history table with pagination
+
+**Files Added:**
+- `src-tauri/migrations/005_license_audit.sql`
+- `src-tauri/src/db/license_audit_repo.rs`
+- `src-tauri/src/license_gen/mod.rs`, `payload.rs`, `signer.rs`
+- `src-tauri/src/commands/license_gen.rs`
+- `src/pages/LicenseGenPage.tsx`
+- `src/hooks/use-license-gen.ts`
+
+**Validation:** cargo build + tsc --noEmit both pass cleanly
+
+### Next: Selective Decryption
 
 **Problem:** Currently, user must decrypt for all recipients in a batch. Some workflows require decrypting only files intended for specific recipients.
 

@@ -8,7 +8,72 @@ All notable changes to this project are documented here. This file tracks featur
 
 ## [Unreleased]
 
-(No unreleased changes at this time)
+### New Features
+
+#### License Gen Page — Server-Side License Generation
+
+**Status:** COMPLETE  
+**Branch:** `feature/licenseGen`  
+**Implementation Date:** 2026-04-07
+
+**Summary:**
+Added a new License Gen page to the CAHTQT PKI Server app. Administrators can now import client Machine Credential JSON files, sign hardware-bound licenses using the server's PKCS#11 token (Bit4ID), and track issuance history in SQLite.
+
+**Components Added:**
+
+1. **Database**
+   - Migration `005_license_audit.sql` — `license_audit` table for issuance history
+   - Repository module `license_audit_repo.rs` — CRUD operations for audit records
+
+2. **Rust Backend**
+   - Core `license_gen/` module:
+     - `mod.rs` — `MachineCredential` struct + validation
+     - `payload.rs` — `LicensePayload` + machine fingerprint computation (SHA-256)
+     - `signer.rs` — PKCS#11 RSA-PSS signing + license.dat assembly
+   - Tauri commands:
+     - `import_credential(path)` — Parse + validate credential JSON
+     - `generate_license(credential, expires_at, unit_name)` — Sign + output license.dat
+     - `list_license_audit(limit, offset)` — Query issuance history
+
+3. **Frontend (React)**
+   - `LicenseGenPage.tsx` — Main page component
+   - `use-license-gen.ts` — Custom hook for state management
+   - Sidebar navigation entry with FileKey icon
+   - Route `/license-gen`
+
+**Key Features:**
+- Import Machine Credential JSON with validation
+- Real-time machine fingerprint computation (16-char hex)
+- License expiry control: date picker + perpetual toggle
+- PKCS#11 token integration (RSA-PSS with SHA-256)
+- Audit history table (paginated)
+- Operation guard to prevent concurrent token sessions
+
+**Security:**
+- Private key never leaves token (C_Sign only)
+- Canonical JSON serialization for consistent signatures
+- Token serial validation + audit logging
+- Masked token serials in UI
+
+**Dependencies Added:**
+- `sha2 = "0.10"` — SHA-256 hashing
+- `hex = "0.4"` — Hex encoding
+- `base64 = "0.22"` — Base64 encoding for license.dat
+
+**Files Modified:**
+- `src-tauri/Cargo.toml` — Added crypto deps
+- `src-tauri/src/lib.rs` — Added `pub mod license_gen;`
+- `src-tauri/src/commands/mod.rs` — Added `pub mod license_gen;`
+- `src-tauri/src/commands/mod.rs` — Registered 3 new Tauri commands
+- `src-tauri/src/db/mod.rs` — Added migration block + module declaration
+- `src/App.tsx` — Added `/license-gen` route
+- `src/components/app-sidebar.tsx` — Added nav item
+
+**Validation:**
+- `cargo build` — zero errors
+- `tsc --noEmit` — zero TS errors
+- All 3 commands registered in Tauri invoke handler
+- Migration creates table on fresh DB (user_version bumps to 5)
 
 ---
 

@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { NavLink } from "react-router-dom";
-import { Lock, Unlock, Users, Settings, ChevronLeft, ChevronRight } from "lucide-react";
+import { Lock, Unlock, Users, FileKey, Settings, ChevronLeft, ChevronRight } from "lucide-react";
 
 const NAV_ITEMS = [
-  { to: "/encrypt",  label: "Encrypt",  Icon: Lock },
-  { to: "/decrypt",  label: "Decrypt",  Icon: Unlock },
-  { to: "/groups",   label: "Partners", Icon: Users },
-  { to: "/settings", label: "Settings", Icon: Settings },
+  { to: "/encrypt",     label: "Encrypt",     Icon: Lock },
+  { to: "/decrypt",     label: "Decrypt",     Icon: Unlock },
+  { to: "/groups",      label: "Partners",    Icon: Users },
+  { to: "/license-gen", label: "License Gen", Icon: FileKey },
+  { to: "/settings",    label: "Settings",    Icon: Settings },
 ];
 
 export default function AppSidebar() {

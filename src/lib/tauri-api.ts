@@ -5,11 +5,15 @@ import type {
   AppInfo,
   AppSettings,
   CertInfo,
+  CredentialPreview,
   DecryptResult,
   EncLog,
   EncryptResult,
+  GenerateLicenseResult,
+  LicenseAuditEntry,
   LibraryInfo,
   LoginTokenResult,
+  MachineCredential,
   Partner,
   PartnerMember,
   SenderCertExportResult,
@@ -162,3 +166,21 @@ export const setCommunication = (
 
 export const listLogs = (limit: number, offset: number) =>
   invoke<EncLog[]>("list_logs", { limit, offset });
+
+// ---- License Gen -------------------------------------------------------------
+
+export const selectCredentialFile = () =>
+  selectFiles([{ name: "JSON Files", extensions: ["json"] }]);
+
+export const importCredential = (path: string) =>
+  invoke<CredentialPreview>("import_credential", { path });
+
+export const generateLicense = (
+  credential: MachineCredential,
+  expiresAt: number | null,
+  unitName: string,
+) =>
+  invoke<GenerateLicenseResult>("generate_license", { credential, expiresAt, unitName });
+
+export const listLicenseAudit = (limit: number, offset: number) =>
+  invoke<LicenseAuditEntry[]>("list_license_audit", { limit, offset });

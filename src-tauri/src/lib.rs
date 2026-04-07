@@ -5,6 +5,7 @@ pub mod db;
 pub mod etoken;
 pub mod ffi_helpers;
 pub mod htqt_ffi;
+pub mod license_gen;
 pub mod lock_helper;
 pub mod models;
 pub mod output_dir;
@@ -44,6 +45,7 @@ fn initialize_data_directories(app_data_dir: &Path) {
         data.join("DB"),
         data.join("ENCRYPT"),
         data.join("DECRYPT"),
+        data.join("LICENSE"),
         data.join("LOGS"),
         data.join("CONFIG"),
     ];
@@ -146,6 +148,9 @@ pub fn run() {
             commands::decrypt::decrypt_batch,
             commands::communication::set_communication,
             commands::logs::list_logs,
+            commands::license_gen::import_credential,
+            commands::license_gen::generate_license,
+            commands::license_gen::list_license_audit,
         ])
         .run(tauri::generate_context!())
         .expect("Error while running CAHTQT application");

@@ -1,3 +1,4 @@
+pub mod license_audit_repo;
 pub mod logs_repo;
 pub mod partner_members_repo;
 pub mod partners_repo;
@@ -116,6 +117,15 @@ async fn run_migrations(pool: &Pool<Sqlite>) -> Result<(), sqlx::Error> {
         let sql = include_str!("../../migrations/004_add_cert_org.sql");
         let stmts: Vec<&str> = sql.split(';').collect();
         run_migration(pool, &stmts, 4)
+            .await
+            .map_err(|e| e)?;
+    }
+
+    // Migration 005 — license_audit table for license generation history
+    if version < 5 {
+        let sql = include_str!("../../migrations/005_license_audit.sql");
+        let stmts: Vec<&str> = sql.split(';').collect();
+        run_migration(pool, &stmts, 5)
             .await
             .map_err(|e| e)?;
     }
