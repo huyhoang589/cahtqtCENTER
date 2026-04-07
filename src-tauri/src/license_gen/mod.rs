@@ -3,6 +3,19 @@ pub mod signer;
 
 use serde::{Deserialize, Serialize};
 
+/// Sanitize user name for safe filesystem path usage.
+/// Returns "unknown" if name is empty after trimming.
+pub fn sanitize_user_name(name: &str) -> String {
+    let trimmed = name.trim();
+    if trimmed.is_empty() {
+        return "unknown".to_string();
+    }
+    trimmed
+        .chars()
+        .map(|c| if c.is_alphanumeric() || c == '-' || c == '_' { c } else { '_' })
+        .collect()
+}
+
 /// Machine Credential JSON from client Registration Tool.
 /// `rename_all = "camelCase"` matches Tauri's default serialization.
 /// `alias` on each field allows reading snake_case JSON files from the Registration Tool.

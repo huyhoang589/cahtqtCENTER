@@ -220,6 +220,7 @@ export interface LicenseAuditEntry {
   product: string;
   expiresAt: number | null;
   createdAt: number;
+  licenseBlob: string | null;
 }
 
 export type CertExpiryStatus = "valid" | "expiring_soon" | "expired";

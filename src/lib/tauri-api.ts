@@ -184,3 +184,12 @@ export const generateLicense = (
 
 export const listLicenseAudit = (limit: number, offset: number) =>
   invoke<LicenseAuditEntry[]>("list_license_audit", { limit, offset });
+
+export const exportLicense = (auditId: string) =>
+  invoke<string>("export_license", { auditId });
+
+export const deleteLicense = (auditId: string) =>
+  invoke<void>("delete_license", { auditId });
+
+export const openLicenseFolder = (userName: string) =>
+  invoke<void>("open_license_folder", { userName });

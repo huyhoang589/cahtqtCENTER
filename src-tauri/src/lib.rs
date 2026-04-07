@@ -151,6 +151,9 @@ pub fn run() {
             commands::license_gen::import_credential,
             commands::license_gen::generate_license,
             commands::license_gen::list_license_audit,
+            commands::license_gen::export_license,
+            commands::license_gen::delete_license,
+            commands::license_gen::open_license_folder,
         ])
         .run(tauri::generate_context!())
         .expect("Error while running CAHTQT application");

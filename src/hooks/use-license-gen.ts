@@ -5,9 +5,12 @@ import type {
   LicenseAuditEntry,
 } from "../types";
 import {
+  deleteLicense,
+  exportLicense,
   generateLicense,
   importCredential,
   listLicenseAudit,
+  openLicenseFolder,
   selectCredentialFile,
 } from "../lib/tauri-api";
 
@@ -69,6 +72,33 @@ export function useLicenseGen() {
     }
   }, [credential, expiresAt, isPerpetual, unitName, loadAuditHistory]);
 
+  const handleExport = useCallback(async (id: string) => {
+    try {
+      const path = await exportLicense(id);
+      setResult({ success: true, outputPath: path, machineFp: "", error: null });
+    } catch (e) {
+      setResult({ success: false, outputPath: "", machineFp: "", error: String(e) });
+    }
+  }, []);
+
+  const handleDelete = useCallback(async (id: string) => {
+    try {
+      await deleteLicense(id);
+      await loadAuditHistory();
+      setResult(null);
+    } catch (e) {
+      setResult({ success: false, outputPath: "", machineFp: "", error: String(e) });
+    }
+  }, [loadAuditHistory]);
+
+  const handleOpenFolder = useCallback(async (userName: string) => {
+    try {
+      await openLicenseFolder(userName);
+    } catch {
+      // Silently fail — folder may not exist yet
+    }
+  }, []);
+
   return {
     credential,
     expiresAt,
@@ -82,6 +112,9 @@ export function useLicenseGen() {
     auditEntries,
     handleImport,
     handleGenerate,
+    handleExport,
+    handleDelete,
+    handleOpenFolder,
     loadAuditHistory,
   };
 }

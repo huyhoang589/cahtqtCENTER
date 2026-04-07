@@ -42,11 +42,7 @@ pub fn write_license_file(
     user_name: &str,
     content: &str,
 ) -> Result<String, String> {
-    // Sanitize user_name for filesystem safety
-    let safe_name: String = user_name
-        .chars()
-        .map(|c| if c.is_alphanumeric() || c == '-' || c == '_' { c } else { '_' })
-        .collect();
+    let safe_name = super::sanitize_user_name(user_name);
     let file_name = format!("{}-license.dat", safe_name);
     let path = std::path::Path::new(output_dir).join(&file_name);
 

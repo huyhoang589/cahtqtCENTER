@@ -12,6 +12,7 @@ export default function LicenseGenPage() {
     unitName, setUnitName,
     isGenerating, result, auditEntries,
     handleImport, handleGenerate,
+    handleExport, handleDelete, handleOpenFolder,
   } = useLicenseGen();
 
   const canGenerate =
@@ -25,10 +26,6 @@ export default function LicenseGenPage() {
     const ts = Math.floor(new Date(val).getTime() / 1000);
     if (!isNaN(ts)) setExpiresAt(ts);
   };
-
-  // Mask token serial: show first 4 chars + ****
-  const maskSerial = (s: string) =>
-    s.length > 4 ? s.slice(0, 4) + "****" : s;
 
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
@@ -56,26 +53,44 @@ export default function LicenseGenPage() {
           </div>
         )}
 
-        {/* Credential preview */}
+        {/* Preview cards: Credential (left) + License Payload (right) */}
         {credential && (
-          <div style={{ border: "1px solid var(--color-border-light)", borderRadius: "var(--radius-md)", padding: 16 }}>
-            <div style={{ fontSize: "var(--font-size-sm)", fontWeight: "var(--font-weight-bold)", marginBottom: 8, color: "var(--color-text-on-light)" }}>Credential Preview</div>
-            {!credential.isValid && (
-              <div style={{ color: "var(--color-error, #dc2626)", fontSize: "var(--font-size-xs)", marginBottom: 8 }}>
-                {credential.validationError}
+          <div style={{ display: "flex", gap: 16 }}>
+            {/* Left: Credential Preview */}
+            <div style={{ flex: 1, border: "1px solid var(--color-border-light)", borderRadius: "var(--radius-md)", padding: 16 }}>
+              <div style={{ fontWeight: "bold", marginBottom: 8, color: "#000" }}>Credential Preview</div>
+              {!credential.isValid && (
+                <div style={{ color: "var(--color-error, #dc2626)", fontSize: "var(--font-size-xs)", marginBottom: 8 }}>
+                  {credential.validationError}
+                </div>
+              )}
+              <div style={{ display: "grid", gridTemplateColumns: "120px 1fr", gap: "4px 12px", fontSize: "var(--font-size-sm)" }}>
+                <span style={{ color: "#333" }}>User</span>
+                <span style={{ color: "#000" }}>{credential.credential.userName}</span>
+                <span style={{ color: "#333" }}>Token Serial</span>
+                <span style={{ color: "#000", fontFamily: "monospace", fontSize: "var(--font-size-xs)" }}>{credential.credential.tokenSerial}</span>
+                <span style={{ color: "#333" }}>CPU ID</span>
+                <span style={{ color: "#000", fontFamily: "monospace", fontSize: "var(--font-size-xs)" }}>{credential.credential.cpuId}</span>
+                <span style={{ color: "#333" }}>Board Serial</span>
+                <span style={{ color: "#000", fontFamily: "monospace", fontSize: "var(--font-size-xs)" }}>{credential.credential.boardSerial}</span>
+                <span style={{ color: "#333" }}>Registered At</span>
+                <span style={{ color: "#000" }}>{credential.credential.registeredAt}</span>
               </div>
-            )}
-            <div style={{ display: "grid", gridTemplateColumns: "120px 1fr", gap: "4px 12px", fontSize: "var(--font-size-sm)" }}>
-              <span style={{ color: "var(--color-text-secondary)" }}>User</span>
-              <span>{credential.credential.userName}</span>
-              <span style={{ color: "var(--color-text-secondary)" }}>Token Serial</span>
-              <span>{maskSerial(credential.credential.tokenSerial)}</span>
-              <span style={{ color: "var(--color-text-secondary)" }}>CPU ID</span>
-              <span style={{ fontFamily: "monospace", fontSize: "var(--font-size-xs)" }}>{credential.credential.cpuId}</span>
-              <span style={{ color: "var(--color-text-secondary)" }}>Board Serial</span>
-              <span style={{ fontFamily: "monospace", fontSize: "var(--font-size-xs)" }}>{credential.credential.boardSerial}</span>
-              <span style={{ color: "var(--color-text-secondary)" }}>Machine FP</span>
-              <span style={{ fontFamily: "monospace", fontSize: "var(--font-size-xs)" }}>{credential.machineFp}</span>
+            </div>
+
+            {/* Right: License Payload Preview */}
+            <div style={{ flex: 1, border: "1px solid var(--color-border-light)", borderRadius: "var(--radius-md)", padding: 16 }}>
+              <div style={{ fontWeight: "bold", marginBottom: 8, color: "#000" }}>License Preview</div>
+              {result?.success ? (
+                <div style={{ display: "grid", gridTemplateColumns: "120px 1fr", gap: "4px 12px", fontSize: "var(--font-size-sm)" }}>
+                  <span style={{ color: "#333" }}>Machine FP</span>
+                  <span style={{ color: "#000", fontFamily: "monospace", fontSize: "var(--font-size-xs)" }}>{result.machineFp || credential.machineFp}</span>
+                  <span style={{ color: "#333" }}>Output Path</span>
+                  <span style={{ color: "#000", fontSize: "var(--font-size-xs)", wordBreak: "break-all" }}>{result.outputPath}</span>
+                </div>
+              ) : (
+                <div style={{ color: "#999", fontSize: "var(--font-size-sm)" }}>Generate a license to preview</div>
+              )}
             </div>
           </div>
         )}
@@ -103,23 +118,30 @@ export default function LicenseGenPage() {
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "var(--font-size-sm)" }}>
               <thead>
                 <tr style={{ background: "var(--color-bg-sidebar)", borderBottom: "1px solid var(--color-border-light)" }}>
-                  {["Date", "User", "Unit", "Token", "Machine FP", "Expiry"].map((h) => (
+                  {["Date", "User", "Unit", "Token", "Machine FP", "Expiry", "Actions"].map((h) => (
                     <th key={h} style={{ padding: "8px 10px", textAlign: "left", fontWeight: "var(--font-weight-medium)", color: "var(--color-text-secondary)" }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {auditEntries.length === 0 && (
-                  <tr><td colSpan={6} style={{ padding: "16px 10px", textAlign: "center", color: "var(--color-text-secondary)" }}>No licenses generated yet</td></tr>
+                  <tr><td colSpan={7} style={{ padding: "16px 10px", textAlign: "center", color: "var(--color-text-secondary)" }}>No licenses generated yet</td></tr>
                 )}
                 {auditEntries.map((e) => (
                   <tr key={e.id} style={{ borderBottom: "1px solid var(--color-border-light)" }}>
                     <td style={{ padding: "6px 10px" }}>{new Date(e.createdAt * 1000).toLocaleDateString()}</td>
                     <td style={{ padding: "6px 10px" }}>{e.userName}</td>
                     <td style={{ padding: "6px 10px" }}>{e.unitName}</td>
-                    <td style={{ padding: "6px 10px", fontFamily: "monospace" }}>{maskSerial(e.tokenSerial)}</td>
+                    <td style={{ padding: "6px 10px", fontFamily: "monospace" }}>{e.tokenSerial}</td>
                     <td style={{ padding: "6px 10px", fontFamily: "monospace", fontSize: "var(--font-size-xs)" }}>{e.machineFp}</td>
                     <td style={{ padding: "6px 10px" }}>{e.expiresAt ? new Date(e.expiresAt * 1000).toLocaleDateString() : "Perpetual"}</td>
+                    <td style={{ padding: "6px 10px" }}>
+                      <div style={{ display: "flex", gap: 4 }}>
+                        <button className="btn btn-ghost" style={{ fontSize: "var(--font-size-xs)", padding: "2px 6px" }} onClick={() => handleExport(e.id)} disabled={!e.licenseBlob} title={!e.licenseBlob ? "No license data stored" : "Export to file"}>Export</button>
+                        <button className="btn btn-ghost" style={{ fontSize: "var(--font-size-xs)", padding: "2px 6px" }} onClick={() => handleOpenFolder(e.userName)} title="Open LICENSE folder">Open Folder</button>
+                        <button className="btn btn-ghost" style={{ fontSize: "var(--font-size-xs)", padding: "2px 6px", color: "var(--color-error, #dc2626)" }} onClick={() => { if (window.confirm(`Delete license for ${e.userName}?`)) handleDelete(e.id); }}>Delete</button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
