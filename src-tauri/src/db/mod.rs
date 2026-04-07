@@ -130,5 +130,17 @@ async fn run_migrations(pool: &Pool<Sqlite>) -> Result<(), sqlx::Error> {
             .map_err(|e| e)?;
     }
 
+    // Migration 006 — add license_blob column to license_audit (ALTER TABLE is permissive)
+    if version < 6 {
+        let sql = include_str!("../../migrations/006_license_audit_blob.sql");
+        for stmt in sql.split(';') {
+            let trimmed = stmt.trim();
+            if !trimmed.is_empty() {
+                let _ = sqlx::query(trimmed).execute(pool).await;
+            }
+        }
+        sqlx::query("PRAGMA user_version = 6").execute(pool).await?;
+    }
+
     Ok(())
 }
