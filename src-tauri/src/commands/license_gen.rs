@@ -105,6 +105,14 @@ pub async fn generate_license(
     // Validate credential
     license_gen::validate_credential(&credential)?;
 
+    // Validate expires_at is in the future (if provided)
+    if let Some(exp) = expires_at {
+        let now = crate::db::now_secs();
+        if exp <= now {
+            return Err("Expiry date must be in the future".to_string());
+        }
+    }
+
     // Resolve output directory
     let output_dir = crate::output_dir::resolve_output_dir(
         &state.db,

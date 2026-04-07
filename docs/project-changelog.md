@@ -8,6 +8,39 @@ All notable changes to this project are documented here. This file tracks featur
 
 ## [Unreleased]
 
+### Improvements
+
+#### License Gen Input Validation Hardening
+
+**Status:** COMPLETE  
+**Branch:** `feature/licenseGen`  
+**Implementation Date:** 2026-04-07
+
+**Summary:**
+Added input validation to the License Gen feature to strengthen security and error handling:
+
+1. **Credential Import Validation** (`registered_at` field)
+   - Added `chrono::NaiveDate::parse_from_str()` validation to ensure credential registration dates are valid YYYY-MM-DD format
+   - Rejects malformed dates including invalid months (>12) and days (>31 for given month)
+   - Error message provides clear feedback on format requirements
+
+2. **License Expiry Validation** (`expires_at` field)
+   - Added strict future-date check before license generation
+   - Rejects any expiry date equal to or earlier than current Unix timestamp
+   - Allows `None` (perpetual licenses) as per design
+   - No grace period — operator-set expiry dates via UI are assumed accurate
+
+**Files Modified:**
+- `src-tauri/src/license_gen/mod.rs` — Added `registered_at` chrono validation in `validate_credential()`
+- `src-tauri/src/commands/license_gen.rs` — Added `expires_at` future check in `generate_license()`
+
+**Validation:**
+- `cargo check` — passes cleanly
+- All existing functionality unchanged
+- Low-risk additive validation (no breaking changes)
+
+---
+
 ### New Features
 
 #### License Gen Page — Server-Side License Generation

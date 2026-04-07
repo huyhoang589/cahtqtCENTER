@@ -38,5 +38,18 @@ pub fn validate_credential(cred: &MachineCredential) -> Result<(), String> {
             return Err(format!("Invalid {}: placeholder value '{}'", field, v));
         }
     }
+
+    // Validate registered_at is a valid YYYY-MM-DD date
+    let date_str = cred.registered_at.trim();
+    if date_str.is_empty() {
+        return Err("Invalid registered_at: empty".to_string());
+    }
+    if chrono::NaiveDate::parse_from_str(date_str, "%Y-%m-%d").is_err() {
+        return Err(format!(
+            "Invalid registered_at: '{}' is not a valid YYYY-MM-DD date",
+            date_str
+        ));
+    }
+
     Ok(())
 }

@@ -97,6 +97,11 @@ v3.0.0 (Future — H2 2026)
 - Sidebar navigation entry
 - Audit history table with pagination
 
+**Input Validation Hardening (2026-04-07):**
+- `registered_at` field: chrono-based YYYY-MM-DD format validation with proper month/day range checks
+- `expires_at` field: strict future-date check before license generation (no grace period)
+- Both validations prevent invalid licenses from being generated
+
 **Files Added:**
 - `src-tauri/migrations/005_license_audit.sql`
 - `src-tauri/src/db/license_audit_repo.rs`
@@ -105,7 +110,11 @@ v3.0.0 (Future — H2 2026)
 - `src/pages/LicenseGenPage.tsx`
 - `src/hooks/use-license-gen.ts`
 
-**Validation:** cargo build + tsc --noEmit both pass cleanly
+**Files Modified (for validation):**
+- `src-tauri/src/license_gen/mod.rs` — added date format validation
+- `src-tauri/src/commands/license_gen.rs` — added expiry check
+
+**Validation:** cargo build + tsc --noEmit + cargo check all pass cleanly
 
 ### Next: Selective Decryption
 
