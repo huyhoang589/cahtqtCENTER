@@ -1,8 +1,8 @@
 # Codebase Summary
 
 **Project:** CAHTQT — PKI Encryption Desktop App  
-**Last Updated:** 2026-04-05  
-**Status:** Feature-complete (Crypto API v2 migration)
+**Last Updated:** 2026-04-07  
+**Status:** Feature-complete (License Gen v1.1 with export/delete/folder management)
 
 ## Overview
 
@@ -138,6 +138,12 @@ cahtqt-center/
 **Commands:**
 - `encrypt_batch()` — Batch encrypt M files × N recipients
 - `decrypt_batch()` — Batch decrypt M `.sf1` files
+- `import_credential(path)` — Parse + validate Machine Credential JSON
+- `generate_license(credential, expires_at, unit_name)` — Sign license via PKCS#11 token
+- `list_license_audit(limit, offset)` — Paginated license generation history
+- `export_license(audit_id)` — Export stored license blob to disk
+- `delete_license(audit_id)` — Hard-delete audit record and file
+- `open_license_folder(user_name)` — Open license directory in file explorer
 - `scan_tokens()` — Enumerate PKCS#11 tokens
 - `get_token_certificates()` — List certificates on token
 - `login_token()` — Unlock token with PIN
@@ -264,7 +270,18 @@ Return DecryptResult with paths
 - PKCS#11 library (eToken, Thales, etc.)
 - `crypto_dll.dll` (v2 with SF v1 format support)
 
-## Recent Changes (v2 Migration)
+## Recent Changes
+
+**2026-04-07: License Change v1 — Export, Delete, and Folder Management**
+
+- **Database:** Migration `006_license_audit_blob.sql` adds `license_blob TEXT` to `license_audit` table
+- **License Gen Commands:** Added 3 new commands:
+  - `export_license(audit_id)` — Retrieve + write stored license blob
+  - `delete_license(audit_id)` — Hard-delete audit record + disk file
+  - `open_license_folder(user_name)` — Open license dir in file explorer
+- **Utilities:** Added `sanitize_user_name()` helper for safe filesystem paths
+- **Output Path:** Updated to `{base}\SF\LICENSE\{sanitized_user_name}\{sanitized_user_name}-license.dat`
+- **Security:** Path traversal protection in delete/export via expected path reconstruction
 
 **2026-04-05: Crypto API Migration (SF v1 Format)**
 

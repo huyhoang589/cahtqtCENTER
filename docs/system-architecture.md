@@ -1,7 +1,7 @@
 # System Architecture
 
-**Last Updated:** 2026-04-05  
-**Status:** Updated for Crypto API v2 (SF v1 format migration)
+**Last Updated:** 2026-04-07  
+**Status:** Updated for License Gen v1.1 (export/delete/folder management commands)
 
 ## High-Level Architecture
 
@@ -10,21 +10,26 @@ CAHTQT is a desktop application with three main layers:
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                    React Frontend (TypeScript)              │
-│  Encrypt/Decrypt Pages • Recipient Groups • Token Settings  │
+│  Encrypt/Decrypt • License Gen • Recipients • Settings      │
 │                   (Vite build + HMR dev)                    │
 └────────────────────┬────────────────────────────────────────┘
                      │ Tauri IPC (JSON serialization)
                      ↓
 ┌─────────────────────────────────────────────────────────────┐
 │              Tauri Backend (Rust) — Commands                │
-│  ├─ encrypt_batch()     ├─ scan_tokens()                    │
-│  ├─ decrypt_batch()     ├─ get_token_certificates()        │
-│  ├─ login_token()       └─ Settings persistence            │
+│  ├─ encrypt_batch()           ├─ scan_tokens()             │
+│  ├─ decrypt_batch()           ├─ get_token_certificates()  │
+│  ├─ login_token()             ├─ Settings persistence      │
+│  ├─ import_credential()       ├─ License Gen Signing       │
+│  ├─ generate_license()        ├─ export_license()          │
+│  ├─ list_license_audit()      ├─ delete_license()          │
+│  └─ open_license_folder()                                   │
 │                                                              │
 │  Supporting Modules:                                         │
-│  ├─ PKCS#11 Integration (etoken/)                          │
-│  ├─ Crypto FFI (htqt_ffi/)                                 │
-│  ├─ Database (db/)                                          │
+│  ├─ License Gen (license_gen/)  — Payload & signing        │
+│  ├─ PKCS#11 Integration (etoken/) — Token mgmt             │
+│  ├─ Crypto FFI (htqt_ffi/)       — DLL wrapper            │
+│  ├─ Database (db/)               — SQLite repos            │
 │  └─ Certificate Parsing (cert_parser.rs)                    │
 └─────────────────────┬──────────────────────────────────────┘
                       │ FFI calls
@@ -94,6 +99,14 @@ CAHTQT is a desktop application with three main layers:
 5. Emit progress events as files decrypt
 6. Return decrypted file paths from `BatchResult.output_path`
 
+**License Gen Commands:**
+1. `import_credential(path)` — Parse + validate Machine Credential JSON, return preview
+2. `generate_license(credential, expires_at, unit_name)` — Sign license via token, store blob, return path
+3. `list_license_audit(limit, offset)` — Paginated audit history with blobs
+4. `export_license(audit_id)` — Retrieve stored license blob, write to `SF\LICENSE\{safe_name}\`
+5. `delete_license(audit_id)` — Hard-delete audit record and disk file
+6. `open_license_folder(user_name)` — Open license directory in Windows Explorer
+
 **Token Management:**
 - `login_token()` — Open PKCS#11 session, cache PIN in memory
 - `logout_token()` — Close session, clear PIN
@@ -153,6 +166,7 @@ pub fn dec_sf(
 - `PartnersRepo` — Recipient groups
 - `PartnerMembersRepo` — Recipients within groups
 - `LogsRepo` — Operation history (encryption/decryption audit trail)
+- `LicenseAuditRepo` — License generation audit trail with blobs
 
 **Schema:**
 ```sql
@@ -169,6 +183,20 @@ partner_members (id INTEGER, partner_id INTEGER, cert_der BLOB,
 -- Operation log
 logs (id INTEGER PRIMARY KEY, operation TEXT, success INTEGER, 
       file_count INTEGER, created_at DATETIME)
+
+-- License audit trail (with optional blob storage)
+license_audit (
+  id TEXT PRIMARY KEY,
+  server_serial TEXT,
+  user_name TEXT,
+  unit_name TEXT,
+  token_serial TEXT,
+  machine_fp TEXT,
+  product TEXT,
+  expires_at INTEGER,
+  created_at INTEGER,
+  license_blob TEXT
+)
 ```
 
 ### 3. Crypto DLL (Native C Library)

@@ -10,6 +10,62 @@ All notable changes to this project are documented here. This file tracks featur
 
 ### Improvements
 
+#### License Change v1 — Export, Delete, and Folder Management
+
+**Status:** COMPLETE  
+**Branch:** `feature/licenseGen`  
+**Implementation Date:** 2026-04-07
+
+**Summary:**
+Enhanced License Gen feature with file management and export capabilities. Users can now export previously-generated licenses, delete audit records with disk cleanup, and open license folders in the system file explorer.
+
+**Key Changes:**
+
+1. **Database**
+   - Migration `006_license_audit_blob.sql` — Added `license_blob TEXT` column to `license_audit` table
+   - Stores full license content for export and audit recovery
+
+2. **Rust Backend**
+   - New Tauri commands:
+     - `export_license(audit_id)` — Retrieve stored license blob and write to `SF\LICENSE\{safe_name}\`
+     - `delete_license(audit_id)` — Hard-delete audit record and remove disk file
+     - `open_license_folder(user_name)` — Open license directory in Windows Explorer
+   - Shared `sanitize_user_name()` helper in `license_gen` module
+   - Output path pattern: `{base}\SF\LICENSE\{sanitized_user_name}\{sanitized_user_name}-license.dat`
+   - Path traversal protection via expected path reconstruction in delete/export commands
+
+3. **Frontend (React)**
+   - Split credential preview into 2 cards:
+     - Credential card (token serial, CPU ID, board serial, user name, registration date)
+     - License payload card (product, machine fingerprint, expiry, server serial)
+   - Audit history table now includes action buttons: **Export**, **Delete**, **Open Folder**
+   - Removed serial masking — all text now rendered in black (not dimmed)
+   - Enhanced error handling for missing/corrupted license blobs
+
+**Files Modified:**
+
+*Database:*
+- `src-tauri/migrations/006_license_audit_blob.sql`
+
+*Rust Backend:*
+- `src-tauri/src/commands/license_gen.rs` — Added 3 new commands + updated response types
+- `src-tauri/src/license_gen/mod.rs` — Added `sanitize_user_name()` utility
+
+*Frontend:*
+- `src/pages/LicenseGenPage.tsx` — Split preview cards, add action buttons
+- `src/hooks/use-license-gen.ts` — Updated hook for new commands
+- `src/components/LicenseAuditTable.tsx` — Enhanced with export/delete/open folder actions
+
+**Validation:**
+- `cargo build` — zero errors
+- `tsc --noEmit` — zero TS errors
+- Migration applies cleanly (adds column with default NULL)
+- Backward compatibility maintained (old audit records work without blob)
+
+---
+
+### Improvements
+
 #### License Gen Input Validation Hardening
 
 **Status:** COMPLETE  
