@@ -1,16 +1,14 @@
-use std::ffi::CString;
-
 use libloading::{os::windows::Library as WinLib, Library, Symbol};
 
 use super::types::*;
 use super::DLL_LOCK;
 
-/// htqt_crypto v2 DLL wrapper — resolves 3 symbols: encHTQT_multi, decHTQT_v2, HTQT_GetError.
+/// htqt_crypto v2 DLL wrapper — resolves 3 symbols: encHTQT_sf_multi, decrypt_one_sfv1, HTQT_GetError.
 pub struct HtqtLib {
     #[allow(dead_code)]
     lib: Library, // kept alive so raw fn pointers remain valid
-    enc_multi_fn: *const (),
-    dec_v2_fn: *const (),
+    enc_sf_multi_fn: *const (),
+    decrypt_one_sfv1_fn: *const (),
     #[allow(dead_code)]
     get_error_fn: *const (),
 }
@@ -32,17 +30,17 @@ impl HtqtLib {
                 .map_err(|e| format!("Failed to load htqt_crypto.dll: {}", e))?
         };
 
-        let enc_multi_fn = unsafe {
-            let sym: Symbol<FnEncHTQTMulti> = lib
-                .get(b"encHTQT_multi\0")
-                .map_err(|_| "Symbol 'encHTQT_multi' not found in htqt_crypto.dll".to_string())?;
+        let enc_sf_multi_fn = unsafe {
+            let sym: Symbol<FnEncHTQTSfMulti> = lib
+                .get(b"encHTQT_sf_multi\0")
+                .map_err(|_| "Symbol 'encHTQT_sf_multi' not found in htqt_crypto.dll".to_string())?;
             *sym as *const ()
         };
 
-        let dec_v2_fn = unsafe {
-            let sym: Symbol<FnDecHTQTV2> = lib
-                .get(b"decHTQT_v2\0")
-                .map_err(|_| "Symbol 'decHTQT_v2' not found in htqt_crypto.dll".to_string())?;
+        let decrypt_one_sfv1_fn = unsafe {
+            let sym: Symbol<FnDecryptOneSfv1> = lib
+                .get(b"decrypt_one_sfv1\0")
+                .map_err(|_| "Symbol 'decrypt_one_sfv1' not found in htqt_crypto.dll".to_string())?;
             *sym as *const ()
         };
 
@@ -53,11 +51,11 @@ impl HtqtLib {
             *sym as *const ()
         };
 
-        Ok(HtqtLib { lib, enc_multi_fn, dec_v2_fn, get_error_fn })
+        Ok(HtqtLib { lib, enc_sf_multi_fn, decrypt_one_sfv1_fn, get_error_fn })
     }
 
-    /// Batch encrypt M files × N recipients via encHTQT_multi.
-    /// results slice must have capacity >= file_count * recipient_count.
+    /// Batch encrypt M files × N recipients via encHTQT_sf_multi.
+    /// results slice must have capacity >= file_count.
     /// Returns Ok(rc): 0 = all success, >0 = partial failures in results.
     pub fn enc_multi(
         &self,
@@ -69,43 +67,40 @@ impl HtqtLib {
         let _guard = DLL_LOCK.lock().map_err(|_| "DLL_LOCK poisoned".to_string())?;
 
         let rc = unsafe {
-            let f: FnEncHTQTMulti = std::mem::transmute(self.enc_multi_fn);
+            let f: FnEncHTQTSfMulti = std::mem::transmute(self.enc_sf_multi_fn);
             f(params, cbs, results.as_mut_ptr(), err_buf.as_mut_ptr(), 512)
         };
 
         if rc < 0 {
             let msg = crate::ffi_helpers::string_from_c_buf(&err_buf);
-            Err(format!("encHTQT_multi failed ({}): {}", rc, msg))
+            Err(format!("encHTQT_sf_multi failed ({}): {}", rc, msg))
         } else {
             Ok(rc)
         }
     }
 
-    /// Decrypt a single SF file via decHTQT_v2.
-    pub fn dec_v2(
+    /// Decrypt a single SF v1 file. Returns output file path on success.
+    pub fn decrypt_one_sfv1(
         &self,
-        sf_path: &str,
-        output_path: &str,
-        recipient_id: &str,
+        sf1_path: *const std::ffi::c_char,
+        output_dir: *const std::ffi::c_char,
         cbs: &CryptoCallbacksV2,
-    ) -> Result<(), String> {
-        let sf = CString::new(sf_path).map_err(|e| e.to_string())?;
-        let out = CString::new(output_path).map_err(|e| e.to_string())?;
-        let rid = CString::new(recipient_id).map_err(|e| e.to_string())?;
+        flags: u32,
+    ) -> Result<String, String> {
+        let mut out_path_buf = [0i8; 512];
         let mut err_buf = [0i8; 512];
-
         let _guard = DLL_LOCK.lock().map_err(|_| "DLL_LOCK poisoned".to_string())?;
-
         let rc = unsafe {
-            let f: FnDecHTQTV2 = std::mem::transmute(self.dec_v2_fn);
-            f(sf.as_ptr(), out.as_ptr(), rid.as_ptr(), cbs, err_buf.as_mut_ptr(), 512)
+            let f: FnDecryptOneSfv1 = std::mem::transmute(self.decrypt_one_sfv1_fn);
+            f(sf1_path, output_dir, cbs, flags,
+              out_path_buf.as_mut_ptr(), 512,
+              err_buf.as_mut_ptr(), 512)
         };
-
         if rc != 0 {
             let msg = crate::ffi_helpers::string_from_c_buf(&err_buf);
-            Err(format!("decHTQT_v2 failed ({}): {}", rc, msg))
+            Err(format!("decrypt_one_sfv1 failed ({}): {}", rc, msg))
         } else {
-            Ok(())
+            Ok(crate::ffi_helpers::string_from_c_buf(&out_path_buf))
         }
     }
 }

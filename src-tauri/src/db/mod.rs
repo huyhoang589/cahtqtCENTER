@@ -1,3 +1,4 @@
+pub mod license_audit_repo;
 pub mod logs_repo;
 pub mod partner_members_repo;
 pub mod partners_repo;
@@ -118,6 +119,27 @@ async fn run_migrations(pool: &Pool<Sqlite>) -> Result<(), sqlx::Error> {
         run_migration(pool, &stmts, 4)
             .await
             .map_err(|e| e)?;
+    }
+
+    // Migration 005 — license_audit table for license generation history
+    if version < 5 {
+        let sql = include_str!("../../migrations/005_license_audit.sql");
+        let stmts: Vec<&str> = sql.split(';').collect();
+        run_migration(pool, &stmts, 5)
+            .await
+            .map_err(|e| e)?;
+    }
+
+    // Migration 006 — add license_blob column to license_audit (ALTER TABLE is permissive)
+    if version < 6 {
+        let sql = include_str!("../../migrations/006_license_audit_blob.sql");
+        for stmt in sql.split(';') {
+            let trimmed = stmt.trim();
+            if !trimmed.is_empty() {
+                let _ = sqlx::query(trimmed).execute(pool).await;
+            }
+        }
+        sqlx::query("PRAGMA user_version = 6").execute(pool).await?;
     }
 
     Ok(())

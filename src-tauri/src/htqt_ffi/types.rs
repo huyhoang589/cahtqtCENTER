@@ -11,34 +11,12 @@ pub type FnRsaPssSign = unsafe extern "C" fn(
     user_ctx: *mut c_void,
 ) -> c_int;
 
-/// RSA-OAEP-SHA256 encrypt plaintext using public key from cert_der.
-pub type FnRsaOaepEncryptForCert = unsafe extern "C" fn(
-    plaintext: *const u8,
-    plaintext_len: c_uint,
-    cert_der: *const u8,
-    cert_der_len: c_uint,
-    ciphertext_out: *mut u8,
-    ciphertext_len: *mut c_uint,
-    user_ctx: *mut c_void,
-) -> c_int;
-
 /// RSA-OAEP-SHA256 decrypt ciphertext with caller's private key.
 pub type FnRsaOaepDecrypt = unsafe extern "C" fn(
     ciphertext: *const u8,
     ciphertext_len: c_uint,
     plaintext_out: *mut u8,
     plaintext_len: *mut c_uint,
-    user_ctx: *mut c_void,
-) -> c_int;
-
-/// RSA-PSS-SHA256 verify signature against digest using sender's cert public key.
-pub type FnRsaPssVerify = unsafe extern "C" fn(
-    digest: *const u8,
-    digest_len: c_uint,
-    sig: *const u8,
-    sig_len: c_uint,
-    sender_cert_der: *const u8,
-    sender_cert_der_len: c_uint,
     user_ctx: *mut c_void,
 ) -> c_int;
 
@@ -54,7 +32,7 @@ pub type FnProgressCallback = unsafe extern "C" fn(
 
 // ---- DLL export function pointer types --------------------------------------
 
-pub type FnEncHTQTMulti = unsafe extern "C" fn(
+pub type FnEncHTQTSfMulti = unsafe extern "C" fn(
     params: *const BatchEncryptParams,
     cbs: *const CryptoCallbacksV2,
     results: *mut BatchResult,
@@ -62,13 +40,16 @@ pub type FnEncHTQTMulti = unsafe extern "C" fn(
     error_len: c_int,
 ) -> c_int;
 
-pub type FnDecHTQTV2 = unsafe extern "C" fn(
-    sf_path: *const c_char,
-    output_path: *const c_char,
-    recipient_id: *const c_char,
+/// decrypt_one_sfv1: decrypt a single SF v1 file using callback-based crypto.
+pub type FnDecryptOneSfv1 = unsafe extern "C" fn(
+    sf1_path: *const c_char,
+    output_dir: *const c_char,
     cbs: *const CryptoCallbacksV2,
-    error_msg: *mut c_char,
-    error_len: c_int,
+    flags: c_uint,
+    out_path_buf: *mut c_char,
+    out_path_buf_len: c_int,
+    err_buf: *mut c_char,
+    err_len: c_int,
 ) -> c_int;
 
 pub type FnGetError = unsafe extern "C" fn() -> c_int;
@@ -76,17 +57,17 @@ pub type FnGetError = unsafe extern "C" fn() -> c_int;
 // ---- repr(C) structs matching htqt-api.h exactly ----------------------------
 
 /// Caller-populated callbacks + context passed to enc/dec DLL functions.
+/// Layout must match CryptoCallbacksV2 in htqt-api.h exactly.
+/// RSA-OAEP encrypt and RSA-PSS verify are handled internally by the DLL (no callbacks needed).
 #[repr(C)]
 pub struct CryptoCallbacksV2 {
-    pub sign_fn: Option<FnRsaPssSign>,
-    pub rsa_enc_cert_fn: Option<FnRsaOaepEncryptForCert>,
-    pub rsa_dec_fn: Option<FnRsaOaepDecrypt>,
-    pub verify_fn: Option<FnRsaPssVerify>,
-    pub progress_fn: Option<FnProgressCallback>,
+    pub sign_fn: Option<FnRsaPssSign>,      // RSA-PSS sign with caller's private key (token)
+    pub rsa_dec_fn: Option<FnRsaOaepDecrypt>, // RSA-OAEP decrypt with caller's private key (token)
+    pub progress_fn: Option<FnProgressCallback>, // Optional; return non-0 to cancel
     pub user_ctx: *mut c_void,
-    pub own_cert_der: *const u8,        // for SF v1 compat; NULL if not available
-    pub own_cert_der_len: c_uint,       // 0 = skip SF v1 fingerprint matching
-    pub reserved: [*mut c_void; 3],     // must be NULL
+    pub own_cert_der: *const u8,            // Required: caller's own DER certificate
+    pub own_cert_der_len: c_uint,
+    pub reserved: [*mut c_void; 3],         // must be NULL
 }
 
 // SAFETY: CryptoCallbacksV2 is used only within spawn_blocking;

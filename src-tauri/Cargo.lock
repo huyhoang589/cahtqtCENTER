@@ -239,16 +239,17 @@ dependencies = [
 name = "cahtqt"
 version = "1.0.0"
 dependencies = [
+ "base64 0.22.1",
  "chrono",
  "cryptoki",
  "dirs 5.0.1",
+ "hex",
  "libloading 0.8.9",
- "rand 0.8.5",
- "rsa",
  "secrecy",
  "serde",
  "serde_json",
  "sha1",
+ "sha2",
  "sqlx",
  "tauri",
  "tauri-build",
@@ -3205,7 +3206,6 @@ dependencies = [
  "pkcs1",
  "pkcs8",
  "rand_core 0.6.4",
- "sha2",
  "signature",
  "spki",
  "subtle",

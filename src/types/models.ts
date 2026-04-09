@@ -186,6 +186,43 @@ export interface LoginTokenResult {
 
 // ---- Cert Expiry ---------------------------------------------------------------
 
+// ---- License Gen Types -------------------------------------------------------
+
+export interface MachineCredential {
+  tokenSerial: string;
+  cpuId: string;
+  boardSerial: string;
+  userName: string;
+  registeredAt: string;
+}
+
+export interface CredentialPreview {
+  credential: MachineCredential;
+  machineFp: string;
+  isValid: boolean;
+  validationError: string | null;
+}
+
+export interface GenerateLicenseResult {
+  success: boolean;
+  outputPath: string;
+  machineFp: string;
+  error: string | null;
+}
+
+export interface LicenseAuditEntry {
+  id: string;
+  serverSerial: string;
+  userName: string;
+  unitName: string;
+  tokenSerial: string;
+  machineFp: string;
+  product: string;
+  expiresAt: number | null;
+  createdAt: number;
+  licenseBlob: string | null;
+}
+
 export type CertExpiryStatus = "valid" | "expiring_soon" | "expired";
 
 export function getCertExpiryStatus(valid_to: number): CertExpiryStatus {
