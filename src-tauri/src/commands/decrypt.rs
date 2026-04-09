@@ -11,7 +11,7 @@ use crate::{
     etoken::models::TokenStatus,
     htqt_ffi::{
         callbacks,
-        error_codes::HTQT_BATCH_CONTINUE_ON_ERROR,
+        error_codes::{HTQT_BATCH_CONTINUE_ON_ERROR, HTQT_BATCH_OVERWRITE_OUTPUT},
         token_context::open_token_session,
         CryptoCallbacksV2,
     },
@@ -145,7 +145,7 @@ async fn run_decrypt_batch(
                 cstr.as_ptr(),
                 output_dir_cstring.as_ptr(),
                 &cbs,
-                HTQT_BATCH_CONTINUE_ON_ERROR,
+                HTQT_BATCH_CONTINUE_ON_ERROR | HTQT_BATCH_OVERWRITE_OUTPUT,
             );
             file_results.push((i, result));
         }

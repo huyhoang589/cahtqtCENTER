@@ -13,7 +13,9 @@ use crate::{
     db::logs_repo,
     etoken::models::TokenStatus,
     htqt_ffi::{
-        callbacks, error_codes::HTQT_BATCH_CONTINUE_ON_ERROR, htqt_error_message, htqt_error_name,
+        callbacks,
+        error_codes::{HTQT_BATCH_CONTINUE_ON_ERROR, HTQT_BATCH_OVERWRITE_OUTPUT},
+        htqt_error_message, htqt_error_name,
         token_context::open_token_session, BatchEncryptParams, BatchResult, CryptoCallbacksV2,
         FileEntry, RecipientEntry, HTQT_OK,
     },
@@ -188,7 +190,7 @@ async fn run_encrypt_batch(
             recipients: recip_entries.as_ptr(),
             recipient_count: recip_count as u32,
             output_dir: output_dir_cstring.as_ptr(),
-            flags: HTQT_BATCH_CONTINUE_ON_ERROR,
+            flags: HTQT_BATCH_CONTINUE_ON_ERROR | HTQT_BATCH_OVERWRITE_OUTPUT,
             reserved: [ptr::null_mut(); 2],
         };
 
