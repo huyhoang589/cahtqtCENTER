@@ -1,0 +1,2 @@
+1. add token_serial from Machine Credential to compute_machine_fp in payload.rs
+2. edit LicensePayload (payload.rs) include follow field: machine_fp, expires_at, issued_at, issued_by, product

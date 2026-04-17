@@ -17,21 +17,6 @@ use crate::{
     AppState,
 };
 
-// ---- Dual-PIN flow explanation -----------------------------------------------
-//
-// set_communication accepts a `pin` parameter from the frontend AND may fall
-// back to the PIN stored in AppState.token_login after a successful login_token.
-//
-// Priority:
-//   1. `pin` parameter (non-empty) — used when the user explicitly provides a PIN
-//      via the SetComm dialog (e.g., when session expired or PIN re-entry required).
-//   2. Stored AppState PIN (login.get_pin()) — used when the frontend passes an
-//      empty string, meaning the user's session is still valid from a prior login.
-//
-// The stored PIN lives in a Zeroizing<String> and is cleared on logout_token or
-// app restart. It is NEVER serialized or sent to the frontend.
-// ------------------------------------------------------------------------------
-
 /// Encrypt sender's certificate to a single partner member using encHTQT_multi.
 /// Output: {dest_dir}/SetComm_{partner_name}_{DDMMYYYY}.sf
 #[tauri::command]

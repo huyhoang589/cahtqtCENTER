@@ -1,0 +1,2 @@
+1. set communication not required input token pin because token already logged in settings page
+2. set communication function in Partners Page work at 1st try then fail (encrypt process not running)
