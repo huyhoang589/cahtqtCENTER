@@ -9,7 +9,7 @@ use crate::{
     cert_parser,
     etoken::models::TokenStatus,
     htqt_ffi::{
-        callbacks, error_codes::HTQT_BATCH_CONTINUE_ON_ERROR,
+        callbacks, error_codes::{HTQT_BATCH_CONTINUE_ON_ERROR, HTQT_BATCH_OVERWRITE_OUTPUT},
         token_context::open_token_session, BatchEncryptParams, BatchResult, CryptoCallbacksV2,
         FileEntry, RecipientEntry, HTQT_OK,
     },
@@ -132,7 +132,7 @@ async fn run_set_communication(
             recipients: recip_entries.as_ptr(),
             recipient_count: 1,
             output_dir: out_dir_cs.as_ptr(),
-            flags: HTQT_BATCH_CONTINUE_ON_ERROR,
+            flags: HTQT_BATCH_CONTINUE_ON_ERROR | HTQT_BATCH_OVERWRITE_OUTPUT,
             reserved: [ptr::null_mut(); 2],
         };
 
