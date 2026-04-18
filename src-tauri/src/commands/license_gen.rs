@@ -60,7 +60,7 @@ pub async fn import_credential(path: String) -> Result<CredentialPreview, String
     let cred: MachineCredential = serde_json::from_str(&contents)
         .map_err(|e| format!("Invalid JSON: {}", e))?;
 
-    let machine_fp = payload::compute_machine_fp(&cred.cpu_id, &cred.board_serial);
+    let machine_fp = payload::compute_machine_fp(&cred.cpu_id, &cred.board_serial, &cred.token_serial);
 
     let (is_valid, validation_error) = match license_gen::validate_credential(&cred) {
         Ok(()) => (true, None),
@@ -125,7 +125,7 @@ pub async fn generate_license(
     .await?;
 
     // Compute machine fingerprint
-    let machine_fp = payload::compute_machine_fp(&credential.cpu_id, &credential.board_serial);
+    let machine_fp = payload::compute_machine_fp(&credential.cpu_id, &credential.board_serial, &credential.token_serial);
 
     // Clone data for spawn_blocking
     let cred_clone = credential.clone();
