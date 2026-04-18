@@ -1,17 +1,17 @@
+use std::sync::Arc;
+
 use cryptoki::context::Pkcs11;
 use cryptoki::object::{Attribute, ObjectClass, ObjectHandle};
 use cryptoki::session::{Session, UserType};
 use secrecy::Secret;
 use tauri::AppHandle;
 
-use crate::etoken::token_manager;
-
 /// PKCS#11 session + private key handle + app context for DLL callbacks.
-/// Owns both the Pkcs11 context and Session; Drop closes session then finalizes Pkcs11.
+/// Holds Arc<Pkcs11> shared with AppState — C_Finalize deferred until logout_token drops the Arc.
 pub struct TokenContext {
-    /// PKCS#11 library handle — Option so we can move it out in Drop (finalize takes self).
-    pkcs11: Option<Pkcs11>,
-    /// Active RW session — Option so we can explicitly drop before finalize.
+    /// Kept alive to defer C_Finalize until logout_token drops the last Arc (refcount → 0).
+    _pkcs11: Arc<Pkcs11>,
+    /// Active RW session — Option so we can explicitly drop before session ends.
     session: Option<Session>,
     /// Private key handle (CKA_SIGN=true) found on login.
     pub priv_key_handle: ObjectHandle,
@@ -25,12 +25,9 @@ pub struct TokenContext {
 
 impl Drop for TokenContext {
     fn drop(&mut self) {
-        // Explicitly close session before C_Finalize — PKCS#11 spec requires this order.
+        // Close session only — C_Finalize is deferred to logout_token via Arc lifecycle
         drop(self.session.take());
-        // finalize() takes ownership; move out of Option before calling.
-        if let Some(pkcs11) = self.pkcs11.take() {
-            let _ = pkcs11.finalize();
-        }
+        // Arc<Pkcs11> drops automatically; C_Finalize triggers when last Arc is dropped (at logout)
     }
 }
 
@@ -42,21 +39,17 @@ impl TokenContext {
     }
 }
 
-/// Open a PKCS#11 RW session and login as User.
-/// Creates its own Pkcs11 context (C_Initialize). The is_operation_running guard
-/// prevents concurrent calls, so double-initialize is not an issue.
-/// NOTE: caller must ensure AppState.token_login.pin holds the verified PIN.
+/// Open a PKCS#11 RW session using the persistent Pkcs11 context from AppState.
+/// No C_Initialize — reuses the Arc<Pkcs11> kept alive from login_token to logout_token.
 pub fn open_token_session(
-    pkcs11_lib_path: &str,
+    pkcs11: Arc<Pkcs11>,
     slot_idx: u32,
     pin: &str,
     app: AppHandle,
     own_cert_der: Vec<u8>,
     event_name: String,
 ) -> Result<TokenContext, String> {
-    // Initialize PKCS#11 library (C_Initialize — creates fresh context per command).
-    let pkcs11 = token_manager::initialize(pkcs11_lib_path)?;
-
+    // pkcs11 is the persistent context from AppState — no C_Initialize here
     let raw_slots = pkcs11
         .get_slots_with_token()
         .map_err(|e| format!("Slot enumeration failed: {}", e))?;
@@ -96,7 +89,7 @@ pub fn open_token_session(
         .clone();
 
     Ok(TokenContext {
-        pkcs11: Some(pkcs11),
+        _pkcs11: pkcs11,
         session: Some(session),
         priv_key_handle: priv_key,
         app,

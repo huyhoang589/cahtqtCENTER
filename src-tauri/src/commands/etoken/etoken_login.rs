@@ -1,3 +1,6 @@
+use std::sync::Arc;
+
+use cryptoki::context::Pkcs11;
 use cryptoki::session::UserType;
 use secrecy::Secret;
 use serde::Serialize;
@@ -60,7 +63,7 @@ pub async fn login_token(
     let pin_clone = pin.as_str().to_string();
     let lib_path_clone = pkcs11_lib_path.clone();
 
-    let (cert_cn, verified_lib_path, verified_slot) = tokio::task::spawn_blocking(move || {
+    let (cert_cn, verified_lib_path, verified_slot, pkcs11) = tokio::task::spawn_blocking(move || {
         let pkcs11 = token_manager::initialize(&lib_path_clone)?;
 
         let raw_slots = pkcs11
@@ -99,10 +102,10 @@ pub async fn login_token(
         let cert_cn = certs.first().map(|c| c.subject_cn.clone()).unwrap_or_default();
 
         let _ = session.logout();
-        drop(session); // close session before C_Finalize — PKCS#11 spec requires no open sessions
-        let _ = pkcs11.finalize();
+        drop(session);
+        // Do NOT finalize — keep pkcs11 alive for reuse by operations
 
-        Ok::<(String, String, u32), String>((cert_cn, lib_path_clone, slot_id_u32))
+        Ok::<(String, String, u32, Pkcs11), String>((cert_cn, lib_path_clone, slot_id_u32, pkcs11))
     })
     .await
     .map_err(|e| e.to_string())??;
@@ -146,6 +149,8 @@ pub async fn login_token(
         }
         login.pin = Some(pin); // Zeroizing<String> — stored until logout or app restart
     }
+    // Store persistent Pkcs11 context — C_Finalize deferred to logout_token
+    *safe_lock(&state.pkcs11_handle)? = Some(Arc::new(pkcs11));
 
     if let Some(ref p) = sender_cert_path {
         emit_app_log(&app, "info", &format!("Sender cert saved: {}", p));
@@ -163,6 +168,8 @@ pub async fn logout_token(
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     safe_lock(&state.token_login)?.logout();
+    // Drop Pkcs11 context — triggers C_Finalize cleanly
+    *safe_lock(&state.pkcs11_handle)? = None;
     emit_app_log(&app, "info", "Token logged out");
     Ok(())
 }

@@ -41,25 +41,27 @@ async fn run_set_communication(
     state: &State<'_, AppState>,
 ) -> Result<String, String> {
     // Read sender_cert_path and login state
-    let (pkcs11_lib, slot_id, pin_str, sender_cert_path) = {
+    let (pkcs11_arc, slot_id, pin_str, sender_cert_path) = {
         let login = safe_lock(&state.token_login)?;
         if login.status != TokenStatus::LoggedIn {
             return Err("Token not logged in.".to_string());
         }
         let sender_path = login.sender_cert_path.clone()
             .ok_or("Sender certificate path not available. Re-login to the token.")?;
-        // Use provided pin, fallback to stored pin
         let use_pin = if !pin.is_empty() {
             pin.to_string()
         } else {
             login.get_pin().ok_or("PIN not available — re-login required")?.to_string()
         };
-        (
-            login.pkcs11_lib_path.clone().unwrap_or_default(),
-            login.slot_id.unwrap_or(0),
-            use_pin,
-            sender_path,
-        )
+        let slot = login.slot_id.unwrap_or(0);
+        drop(login); // release login lock before acquiring pkcs11_handle lock
+
+        let pkcs11_guard = safe_lock(&state.pkcs11_handle)?;
+        let pkcs11 = pkcs11_guard.as_ref()
+            .ok_or("PKCS#11 context not initialized — re-login to token")?
+            .clone(); // clone Arc (cheap)
+
+        (pkcs11, slot, use_pin, sender_path)
     };
 
     // Validate sender cert exists
@@ -135,7 +137,7 @@ async fn run_set_communication(
         };
 
         let ctx = open_token_session(
-            &pkcs11_lib,
+            pkcs11_arc,
             slot_id,
             &pin_str,
             app_clone,

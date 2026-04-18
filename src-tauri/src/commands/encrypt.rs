@@ -72,17 +72,21 @@ async fn run_encrypt_batch(
     state: &State<'_, AppState>,
 ) -> Result<EncryptResult, String> {
     // Read and validate token login state
-    let (pkcs11_lib, slot_id, pin_str) = {
+    let (pkcs11_arc, slot_id, pin_str) = {
         let login = safe_lock(&state.token_login)?;
         if login.status != TokenStatus::LoggedIn {
             return Err("Token not logged in — login via Settings first".to_string());
         }
         let pin = login.get_pin().ok_or("PIN not available — re-login required")?.to_string();
-        (
-            login.pkcs11_lib_path.clone().unwrap_or_default(),
-            login.slot_id.unwrap_or(0),
-            pin,
-        )
+        let slot = login.slot_id.unwrap_or(0);
+        drop(login);
+
+        let pkcs11_guard = safe_lock(&state.pkcs11_handle)?;
+        let pkcs11 = pkcs11_guard.as_ref()
+            .ok_or("PKCS#11 context not initialized — re-login to token")?
+            .clone();
+
+        (pkcs11, slot, pin)
     };
 
     if cert_paths.is_empty() {
@@ -196,7 +200,7 @@ async fn run_encrypt_batch(
 
         // Open PKCS#11 session for this batch operation
         let ctx = open_token_session(
-            &pkcs11_lib,
+            pkcs11_arc,
             slot_id,
             &pin_str,
             app_clone,

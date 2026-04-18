@@ -1,6 +1,5 @@
 import { useState } from "react";
 import type { PartnerMember } from "../types";
-import PinDialog from "./pin-dialog";
 import { exportMemberCert, setCommunication } from "../lib/tauri-api";
 
 // C-1: unified status for inline action indicator
@@ -16,7 +15,6 @@ interface Props {
 
 export default function MemberActionButtons({ member, partnerName, outputDataDir, desktopPath, onRemove }: Props) {
   const [actionStatus, setActionStatus] = useState<ActionStatus>("idle");
-  const [showPinDialog, setShowPinDialog] = useState(false);
 
   const baseDir = outputDataDir || desktopPath;
 
@@ -33,7 +31,6 @@ export default function MemberActionButtons({ member, partnerName, outputDataDir
   };
 
   const handleSetComm = async (pin: string) => {
-    setShowPinDialog(false);
     setActionStatus("loading");
     const destDir = `${baseDir}/SF/SET_COMMUNICATION/${partnerName}`;
     try {
@@ -60,7 +57,7 @@ export default function MemberActionButtons({ member, partnerName, outputDataDir
       {/* 🔗 Set Communication */}
       <button
         className="btn-icon"
-        onClick={() => setShowPinDialog(true)}
+        onClick={() => handleSetComm("")}
         disabled={actionStatus === "loading"}
         title="Set Communication"
         style={{ color: "#6366f1" }}
@@ -90,9 +87,7 @@ export default function MemberActionButtons({ member, partnerName, outputDataDir
         onMouseLeave={e => (e.currentTarget.style.background = "")}
       >×</button>
 
-      {showPinDialog && (
-        <PinDialog onConfirm={handleSetComm} onCancel={() => setShowPinDialog(false)} variant="standard" />
-      )}
+
     </div>
   );
 }

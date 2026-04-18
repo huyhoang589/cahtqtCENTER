@@ -59,19 +59,22 @@ async fn run_decrypt_batch(
     state: &State<'_, AppState>,
 ) -> Result<DecryptResult, String> {
     // Read and validate token login state; cert_cn for log only (fingerprint via own_cert_der)
-    let (pkcs11_lib, slot_id, pin_str, cert_cn_log) = {
+    let (pkcs11_arc, slot_id, pin_str, cert_cn_log) = {
         let login = safe_lock(&state.token_login)?;
         if login.status != TokenStatus::LoggedIn {
             return Err("Token not logged in — login via Settings first".to_string());
         }
         let pin = login.get_pin().ok_or("PIN not available — re-login required")?.to_string();
-        let cert_cn = login.cert_cn.clone().unwrap_or_default(); // for log only
-        (
-            login.pkcs11_lib_path.clone().unwrap_or_default(),
-            login.slot_id.unwrap_or(0),
-            pin,
-            cert_cn,
-        )
+        let cert_cn = login.cert_cn.clone().unwrap_or_default();
+        let slot = login.slot_id.unwrap_or(0);
+        drop(login);
+
+        let pkcs11_guard = safe_lock(&state.pkcs11_handle)?;
+        let pkcs11 = pkcs11_guard.as_ref()
+            .ok_or("PKCS#11 context not initialized — re-login to token")?
+            .clone();
+
+        (pkcs11, slot, pin, cert_cn)
     };
 
     // Get sender's own cert DER (for SF v1 backward compat)
@@ -115,7 +118,7 @@ async fn run_decrypt_batch(
 
         // Open ONE PKCS#11 session for all decrypt calls
         let ctx = open_token_session(
-            &pkcs11_lib,
+            pkcs11_arc,
             slot_id,
             &pin_str,
             app_clone,

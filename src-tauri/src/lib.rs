@@ -13,6 +13,7 @@ pub mod output_dir;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
+use cryptoki::context::Pkcs11;
 use sqlx::SqlitePool;
 use tauri::Manager;
 
@@ -32,6 +33,9 @@ pub struct AppState {
     pub last_token_scan: Arc<Mutex<Option<etoken::models::TokenScanResult>>>,
     /// Verified token login state — holds PIN in Zeroizing<String> after successful login
     pub token_login: Arc<Mutex<TokenLoginState>>,
+    /// Persistent PKCS#11 context — kept alive from login_token until logout_token.
+    /// Eliminates C_Initialize/C_Finalize churn that hangs eToken hardware on 2nd call.
+    pub pkcs11_handle: Arc<Mutex<Option<Arc<Pkcs11>>>>,
 }
 
 /// Create required DATA subdirectories under app_data_dir on startup (idempotent).
@@ -116,6 +120,7 @@ pub fn run() {
                 is_operation_running: Arc::new(Mutex::new(false)),
                 last_token_scan: Arc::new(Mutex::new(None)),
                 token_login: Arc::new(Mutex::new(TokenLoginState::default())),
+                pkcs11_handle: Arc::new(Mutex::new(None)),
             });
 
             Ok(())
