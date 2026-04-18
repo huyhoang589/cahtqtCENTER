@@ -8,6 +8,56 @@ All notable changes to this project are documented here. This file tracks featur
 
 ## [Unreleased]
 
+### Bug Fixes
+
+#### SetComm Change v1 — Remove PIN Dialog & Fix Hardware State Corruption
+
+**Status:** COMPLETE  
+**Branch:** `feature/SetComm_change_v1`  
+**Implementation Date:** 2026-04-18
+
+**Summary:**
+Fixed two critical issues in SetComm workflow:
+1. Unnecessary PIN dialog shown before each SetComm call (token already authenticated in Settings)
+2. SetComm button permanently stuck "loading" after first successful call due to PKCS#11 hardware state corruption
+
+**Root Cause Analysis:**
+Per-operation `C_Initialize`/`C_Finalize` cycles corrupted eToken hardware state. After first SetComm's `C_Finalize`, the second call's `open_rw_session()` blocked forever inside Rust's `spawn_blocking` → Tauri command never returned → UI button stayed "loading".
+
+**Solution:**
+
+1. **Frontend (Phase 1):** Removed unnecessary `PinDialog` component from SetComm button
+   - Token is already logged in via Settings page
+   - Backend already falls back to cached PIN when empty string passed
+   - Direct click → `handleSetComm("")` → cached PIN → no dialog needed
+
+2. **Backend (Phase 2):** Persistent PKCS#11 context in AppState
+   - Added `pkcs11_handle: Arc<Mutex<Option<Arc<Pkcs11>>>>` to `AppState`
+   - `login_token`: Returns and stores `Pkcs11` context — **no C_Finalize**
+   - Operations (communication, encrypt, decrypt): Reuse stored `Pkcs11` Arc, open new session only
+   - `logout_token`: Clears `pkcs11_handle` → refcount drops to 0 → C_Finalize triggered cleanly
+
+**Key Changes:**
+
+- **Updated 7 files:**
+  - `src/components/member-action-buttons.tsx` — Removed PIN dialog flow
+  - `src-tauri/src/lib.rs` — Added `pkcs11_handle` field to AppState
+  - `src-tauri/src/commands/etoken/etoken_login.rs` — Return Pkcs11, defer C_Finalize to logout
+  - `src-tauri/src/htqt_ffi/token_context.rs` — Changed `pkcs11` field from `Option<Pkcs11>` to `Arc<Pkcs11>`, removed C_Finalize from Drop
+  - `src-tauri/src/commands/communication.rs` — Read `pkcs11_arc` from AppState
+  - `src-tauri/src/commands/encrypt.rs` — Read `pkcs11_arc` from AppState
+  - `src-tauri/src/commands/decrypt.rs` — Read `pkcs11_arc` from AppState
+
+**Validation:**
+- `cargo build` — zero errors
+- SetComm callable N times consecutively without button hanging
+- Encrypt/Decrypt behavior unchanged
+- Logout properly clears Pkcs11 context and triggers C_Finalize
+
+**Security Impact:** None — Pkcs11 context holds no sensitive data (PIN, keys remain in TokenLoginState)
+
+---
+
 ### Improvements
 
 #### License Change v1 — Export, Delete, and Folder Management

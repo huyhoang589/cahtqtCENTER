@@ -83,6 +83,24 @@ v3.0.0 (Future — H2 2026)
 **Estimated Duration:** 2-3 weeks  
 **Status:** In Progress
 
+### Completed: SetComm Change v1 — Bug Fix (2026-04-18)
+
+**Summary:** Fixed two critical issues with SetComm:
+1. Removed unnecessary PIN dialog (token already authenticated via Settings)
+2. Fixed hardware state corruption causing SetComm button to hang on 2nd+ call
+
+**Root Cause:** Per-operation `C_Initialize`/`C_Finalize` cycles corrupted eToken hardware state.
+
+**Solution:** Persistent PKCS#11 context in AppState from login → logout, reusing it for all operations.
+
+**Files Modified:**
+- Frontend: `src/components/member-action-buttons.tsx`
+- Backend: 6 Rust files in commands/ and htqt_ffi/
+
+**Validation:** `cargo build` clean, SetComm callable N times without hanging.
+
+---
+
 ### Completed: License Gen Page (2026-04-07)
 
 **Summary:** Server-side license generation for hardware-bound licenses. Administrators import Machine Credential JSON, sign with server PKCS#11 token, and track issuance history.
