@@ -641,3 +641,19 @@
 {"ts":"2026-04-09T18:16:07.287Z","hook":"scout-block","event":"PreToolUse","tool":"","target":"","note":"","dur":0,"status":"crash","exit":0,"error":"path should be a `path.relative()`d string, but got \"F:/.PROJECT/.CAHTQT.CENTER.PROJ/cahtqt-center\""}
 {"ts":"2026-04-09T18:16:07.304Z","hook":"privacy-block","event":"PreToolUse","tool":"Bash","target":"","note":"","dur":13,"status":"ok","exit":0,"error":""}
 {"ts":"2026-04-09T18:16:10.395Z","hook":"usage-quota-cache-refresh","event":"PostToolUse","tool":"Bash","target":"","note":"throttled","dur":2,"status":"skip","exit":0,"error":""}
+{"ts":"2026-04-18T02:14:09.985Z","hook":"usage-quota-cache-refresh","event":"PostToolUse","tool":"Bash","target":"","note":"throttled","dur":2,"status":"skip","exit":0,"error":""}
+{"ts":"2026-04-18T02:14:13.507Z","hook":"privacy-block","event":"PreToolUse","tool":"Bash","target":"","note":"","dur":39,"status":"ok","exit":0,"error":""}
+{"ts":"2026-04-18T02:14:13.545Z","hook":"scout-block","event":"PreToolUse","tool":"Bash","target":"","note":"","dur":11,"status":"ok","exit":0,"error":""}
+{"ts":"2026-04-18T02:14:19.538Z","hook":"scout-block","event":"PreToolUse","tool":"Bash","target":"","note":"","dur":8,"status":"ok","exit":0,"error":""}
+{"ts":"2026-04-18T02:14:19.628Z","hook":"privacy-block","event":"PreToolUse","tool":"Bash","target":"","note":"","dur":15,"status":"ok","exit":0,"error":""}
+{"ts":"2026-04-18T02:14:20.382Z","hook":"usage-quota-cache-refresh","event":"PostToolUse","tool":"Bash","target":"","note":"throttled","dur":2,"status":"skip","exit":0,"error":""}
+{"ts":"2026-04-18T02:14:48.821Z","hook":"dev-rules-reminder","event":"UserPromptSubmit","tool":"","target":"","note":"recently-injected","dur":8,"status":"skip","exit":0,"error":""}
+{"ts":"2026-04-18T02:14:49.748Z","hook":"usage-quota-cache-refresh","event":"UserPromptSubmit","tool":"","target":"","note":"fetched","dur":967,"status":"ok","exit":0,"error":""}
+{"ts":"2026-04-18T02:14:53.235Z","hook":"privacy-block","event":"PreToolUse","tool":"Bash","target":"","note":"","dur":24,"status":"ok","exit":0,"error":""}
+{"ts":"2026-04-18T02:14:53.241Z","hook":"scout-block","event":"PreToolUse","tool":"Bash","target":"","note":"","dur":11,"status":"ok","exit":0,"error":""}
+{"ts":"2026-04-18T02:14:58.127Z","hook":"usage-quota-cache-refresh","event":"PostToolUse","tool":"Bash","target":"","note":"throttled","dur":1,"status":"skip","exit":0,"error":""}
+{"ts":"2026-04-18T02:16:01.310Z","hook":"dev-rules-reminder","event":"UserPromptSubmit","tool":"","target":"","note":"recently-injected","dur":31,"status":"skip","exit":0,"error":""}
+{"ts":"2026-04-18T02:16:02.198Z","hook":"usage-quota-cache-refresh","event":"UserPromptSubmit","tool":"","target":"","note":"fetched","dur":909,"status":"ok","exit":0,"error":""}
+{"ts":"2026-04-18T02:16:05.119Z","hook":"scout-block","event":"PreToolUse","tool":"Bash","target":"","note":"","dur":20,"status":"ok","exit":0,"error":""}
+{"ts":"2026-04-18T02:16:05.157Z","hook":"privacy-block","event":"PreToolUse","tool":"Bash","target":"","note":"","dur":28,"status":"ok","exit":0,"error":""}
+{"ts":"2026-04-18T02:16:05.853Z","hook":"usage-quota-cache-refresh","event":"PostToolUse","tool":"Bash","target":"","note":"throttled","dur":1,"status":"skip","exit":0,"error":""}
